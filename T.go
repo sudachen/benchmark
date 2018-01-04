@@ -5,40 +5,58 @@ import (
 	"time"
 	"fmt"
 	"container/list"
+	"runtime/pprof"
+	"bytes"
+	"runtime"
+
+	"github.com/sudachen/misc"
+	"flag"
+	"io/ioutil"
+	"context"
 )
 
-type messageKind byte;
+var flagNoGC = flag.Bool("nogc", false, "disable GC on benchmark")
+var flagPprof = flag.Bool("pprof", false, "profile benchmarks")
+var flagCpuProf = flag.String("cpuprof", misc.NulStr, "where to store cpuprofile")
+
+type messageKind byte
 
 const (
 	MsgError messageKind = iota
 	MsgInfo
 	MsgDebug
+	MsgOpt
+	MsgPprof
 )
 
 func (mk messageKind) String() string {
 	switch mk {
-	case MsgError: return "MsgError"
-	case MsgInfo:  return "MsgInfo"
-	case MsgDebug: return "MsgDebug"
+	case MsgError:  return "MsgError"
+	case MsgInfo:   return "MsgInfo"
+	case MsgDebug:  return "MsgDebug"
+	case MsgOpt: 	return "MsgOpt"
+	case MsgPprof: 	return "MsgPprof"
 	}
 	return ""
 }
 
 type Message struct {
-	Kind messageKind `json:"kind"`
-	Text string		 `json:"text"`
+	Kind messageKind
+	Text string
 }
 
 type T struct {
-	pauseCount int
-	startedAt, pausedAt time.Time
+	enableGC, isStarted, stopProfiler bool
+	startedAt, runOn time.Time
 	processor  func(t *T,finished *T)*T
+	chActive, chPaused time.Duration
 
 	Err   error
 	Label string
 
-	Children, Messages     *list.List
-	Active, Paused, Total  time.Duration
+	Count int
+	Children, Messages *list.List
+	Active, Total time.Duration
 }
 
 func New(label string) *T {
@@ -51,23 +69,65 @@ func New(label string) *T {
 }
 
 func (t *T) run(f func(*T)error) (err error) {
-	t.startedAt = time.Now()
+
+	if t.startedAt != (time.Time{}) {
+		panic("start is allowed only in leaf tasks")
+	}
+
+	t.runOn = time.Now()
 	t.Err = f(t)
-	t.Total = time.Since(t.startedAt)
-	t.Active = t.Total - t.Paused
+	t.Total = time.Since(t.runOn)
+
+	if t.Children.Len() != 0 {
+		t.Active = t.chActive
+	} else {
+		if t.isStarted {
+			t.Active = time.Since(t.startedAt)
+		}
+	}
+
+	if t.enableGC {
+		enableGC()
+	}
+
 	return
 }
 
-func Run(label string, f func(*T)error) *T {
-	t := New(label)
+const PprofBufferReserve = 1024*1024
+
+func (t *T) pprofRun(f func(*T)error) {
+	var buf bytes.Buffer
+	if *flagPprof || *flagCpuProf != misc.NulStr {
+		buf.Grow(PprofBufferReserve)
+		runtime.SetCPUProfileRate(1000)
+		pprof.StartCPUProfile(&buf)
+	}
 	t.run(f)
+	if *flagPprof || *flagCpuProf != misc.NulStr {
+		pprof.StopCPUProfile()
+	}
+	if *flagPprof {
+		WritePprofReport(buf.Bytes(), t,"tagfocus=t:", "top20")
+	}
+	if *flagCpuProf != misc.NulStr {
+		ioutil.WriteFile(*flagCpuProf, buf.Bytes(),0644)
+	}
+}
+
+func Run(label string, f func(*T)error) *T {
+	if !flag.Parsed() { flag.Parse() }
+	runtime.LockOSThread()
+	t := New(label)
+	t.pprofRun(f)
 	return t
 }
 
 func RunWithProcessor(label string, processor func(*T,*T)*T, f func(*T)error) *T {
+	if !flag.Parsed() { flag.Parse() }
+	runtime.LockOSThread()
 	t := New(label)
 	t.processor = processor
-	t.run(f)
+	t.pprofRun(f)
 	if t.processor != nil { t.processor(nil,t) }
 	return t
 }
@@ -75,28 +135,36 @@ func RunWithProcessor(label string, processor func(*T,*T)*T, f func(*T)error) *T
 func (t *T) Run(label string, f func(*T)error) (err error) {
 	t0 := New(label)
 	t0.processor = t.processor
+	if *flagPprof || *flagCpuProf != misc.NulStr {
+		defer pprof.SetGoroutineLabels(context.Background())
+	}
 	t0.run(f)
 	if t.processor != nil { t0 = t.processor(t,t0)}
 	if t0 != nil {
 		t.Children.PushBack(t0)
+		t.chActive += t0.Active
 	}
 	return
 }
 
-func (t *T) Pause() {
-	t.pauseCount++
-	if t.pauseCount == 1 {
-		t.pausedAt = time.Now()
-	}
-}
+func (t *T) Start() {
 
-func (t *T) Resume() {
-	if t.pauseCount > 0 {
-		t.pauseCount--
-		if t.pauseCount == 0 {
-			t.Paused = t.Paused + time.Since(t.pausedAt)
-		}
+	if t.Children.Len() != 0 {
+		panic("start is allowed only in leaf tasks")
 	}
+
+	if !t.isStarted {
+		runtime.GC()
+		if *flagNoGC {
+			t.enableGC = true
+			disableGC()
+		}
+		t.isStarted = true
+		t.startedAt = time.Now()
+		pprof.SetGoroutineLabels(pprof.WithLabels(context.Background(),pprof.Labels("t",t.Label)))
+	}
+
+	t.Count++
 }
 
 func (t *T) Errorf(ft string, a ...interface{}) {
@@ -126,6 +194,16 @@ func (t *T) Infof(ft string, a ...interface{}) {
 
 func (t *T) Info(a ...interface{}) {
 	m := &Message{MsgInfo,fmt.Sprint(a...)}
+	t.Messages.PushBack(m)
+}
+
+func (t *T) Opt(a string) {
+	m := &Message{MsgOpt,a}
+	t.Messages.PushBack(m)
+}
+
+func (t *T) Pprof(a string) {
+	m := &Message{MsgPprof,a}
 	t.Messages.PushBack(m)
 }
 
