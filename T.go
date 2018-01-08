@@ -26,7 +26,6 @@ const (
 	MsgInfo
 	MsgDebug
 	MsgOpt
-	MsgPprof
 )
 
 func (mk messageKind) String() string {
@@ -35,7 +34,6 @@ func (mk messageKind) String() string {
 	case MsgInfo:   return "MsgInfo"
 	case MsgDebug:  return "MsgDebug"
 	case MsgOpt: 	return "MsgOpt"
-	case MsgPprof: 	return "MsgPprof"
 	}
 	return ""
 }
@@ -55,7 +53,7 @@ type T struct {
 	Label string
 
 	Count int
-	Children, Messages *list.List
+	Children, Messages, Pprof *list.List
 	Active, Total time.Duration
 }
 
@@ -107,7 +105,14 @@ func (t *T) pprofRun(f func(*T)error) {
 		pprof.StopCPUProfile()
 	}
 	if *flagPprof {
-		WritePprofReport(buf.Bytes(), t,"tagfocus=t:", "top20")
+		count := 20
+		t.Pprof = list.New()
+		t.Pprof.PushBack(Top(buf.Bytes(), count, Tagged, Msec, "top"))
+		t.Pprof.PushBack(Top(buf.Bytes(), count, Tagged|RuntimeOnly, Msec, "top-rt"))
+		t.Pprof.PushBack(Top(buf.Bytes(), count, Tagged|ExcludeRuntime, Msec, "top-nort"))
+		t.Pprof.PushBack(Top(buf.Bytes(), count+10, Tagged|SortByCum, Msec, "top-cum"))
+		t.Pprof.PushBack(Top(buf.Bytes(), count, DefaultReport, Msec, "top-all"))
+		t.Pprof.PushBack(Top(buf.Bytes(), count+10, SortByCum, Msec, "top-all-cum"))
 	}
 	if *flagCpuProf != misc.NulStr {
 		ioutil.WriteFile(*flagCpuProf, buf.Bytes(),0644)
@@ -201,9 +206,3 @@ func (t *T) Opt(a string) {
 	m := &Message{MsgOpt,a}
 	t.Messages.PushBack(m)
 }
-
-func (t *T) Pprof(a string) {
-	m := &Message{MsgPprof,a}
-	t.Messages.PushBack(m)
-}
-
