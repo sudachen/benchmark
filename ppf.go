@@ -138,7 +138,7 @@ func tuneBy(o Options,u Unit) []string{
 	}
 
 	if (o & Tagged) != 0 {
-		c = append(c,"tagfocus=t:")
+		c = append(c,"tagfocus=t:active")
 	} else {
 		c = append(c,"tagfocus=")
 	}

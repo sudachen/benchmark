@@ -92,7 +92,8 @@ func ComposeDot(w io.Writer, g *Graph, a *DotAttributes, c *DotConfig) {
 	}
 
 	// Add edges to DOT builder. Sort edges by frequency as a hint to the graph layout engine.
-	for _, e := range edges.Sort() {
+	s := edges.Sort()
+	for _, e := range s {
 		builder.addEdge(e, nodeIDMap[e.Src], nodeIDMap[e.Dest], hasNodelets[e.Src])
 	}
 }
@@ -116,7 +117,7 @@ func (b *builder) start() {
 
 // finish closes the opening curly bracket in the constructed DOT buffer.
 func (b *builder) finish() {
-	fmt.Fprintln(b, "}")
+	fmt.Fprintln(b, `}`)
 }
 
 // addLegend generates a legend in DOT format.
@@ -125,16 +126,20 @@ func (b *builder) addLegend() {
 	if len(labels) == 0 {
 		return
 	}
-	title := labels[0]
-	fmt.Fprintf(b, `subgraph cluster_L { "%s" [shape=box fontsize=16`, title)
-	fmt.Fprintf(b, ` label="%s\l"`, strings.Join(labels, `\l`))
-	if b.config.LegendURL != "" {
-		fmt.Fprintf(b, ` URL="%s" target="_blank"`, b.config.LegendURL)
+	n := 0
+	s := ""
+	for _, x := range labels {
+		if (n + len(x)) > 120 {
+			s = s + "\\l"
+			n = 0
+		} else if n != 0 {
+			s = s + "; "
+		}
+		s = s + x
+		n += len(x)
 	}
-	if b.config.Title != "" {
-		fmt.Fprintf(b, ` tooltip="%s"`, b.config.Title)
-	}
-	fmt.Fprintf(b, "] }\n")
+	fmt.Fprintf(b, ` label="%s\l\l"`, s)
+	fmt.Fprintln(b, ` labelloc="t"`)
 }
 
 // addNode generates a graph node in DOT format.

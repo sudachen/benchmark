@@ -67,7 +67,6 @@ func New(label string) *T {
 }
 
 func (t *T) run(f func(*T)error) (err error) {
-
 	if t.startedAt != (time.Time{}) {
 		panic("start is allowed only in leaf tasks")
 	}
@@ -97,7 +96,7 @@ func (t *T) pprofRun(f func(*T)error) {
 	var buf bytes.Buffer
 	if *flagPprof || *flagCpuProf != misc.NulStr {
 		buf.Grow(PprofBufferReserve)
-		runtime.SetCPUProfileRate(1000)
+		runtime.SetCPUProfileRate(10000)
 		pprof.StartCPUProfile(&buf)
 	}
 	t.run(f)
@@ -105,14 +104,14 @@ func (t *T) pprofRun(f func(*T)error) {
 		pprof.StopCPUProfile()
 	}
 	if *flagPprof {
-		count := 20
+		count := 25
 		t.Pprof = list.New()
 		t.Pprof.PushBack(Top(buf.Bytes(), count, Tagged, Msec, "top"))
+		t.Pprof.PushBack(Top(buf.Bytes(), count, Tagged|SortByCum, Msec, "top-cum"))
+		t.Pprof.PushBack(Top(buf.Bytes(), count, DefaultReport, Msec, "top-all"))
+		t.Pprof.PushBack(Top(buf.Bytes(), count, SortByCum, Msec, "top-all-cum"))
 		t.Pprof.PushBack(Top(buf.Bytes(), count, Tagged|RuntimeOnly, Msec, "top-rt"))
 		t.Pprof.PushBack(Top(buf.Bytes(), count, Tagged|ExcludeRuntime, Msec, "top-nort"))
-		t.Pprof.PushBack(Top(buf.Bytes(), count+10, Tagged|SortByCum, Msec, "top-cum"))
-		t.Pprof.PushBack(Top(buf.Bytes(), count, DefaultReport, Msec, "top-all"))
-		t.Pprof.PushBack(Top(buf.Bytes(), count+10, SortByCum, Msec, "top-all-cum"))
 	}
 	if *flagCpuProf != misc.NulStr {
 		ioutil.WriteFile(*flagCpuProf, buf.Bytes(),0644)
@@ -166,7 +165,7 @@ func (t *T) Start() {
 		}
 		t.isStarted = true
 		t.startedAt = time.Now()
-		pprof.SetGoroutineLabels(pprof.WithLabels(context.Background(),pprof.Labels("t",t.Label)))
+		pprof.SetGoroutineLabels(pprof.WithLabels(context.Background(),pprof.Labels("t","active")))
 	}
 
 	t.Count++
