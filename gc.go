@@ -1,4 +1,3 @@
-
 package benchmark
 
 import (
@@ -8,14 +7,14 @@ import (
 
 var gcPercent int = -1
 
-func disableGC(){
+func disableGC() {
 	if gcPercent == -1 {
 		gcPercent = debug.SetGCPercent(-1)
 		runtime.GC()
 	}
 }
 
-func enableGC(){
+func enableGC() {
 	if gcPercent != -1 {
 		debug.SetGCPercent(gcPercent)
 		gcPercent = -1

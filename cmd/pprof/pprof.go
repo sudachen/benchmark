@@ -12,7 +12,8 @@ package main
 import (
 	"fmt"
 	"os"
-	"github.com/google/pprof/driver"
+
+	"github.com/sudachen/benchmark/pprof/driver"
 )
 
 func main() {
@@ -22,4 +23,3 @@ func main() {
 		os.Exit(2)
 	}
 }
-
