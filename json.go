@@ -9,6 +9,8 @@ import (
 	"io/ioutil"
 	"strconv"
 	"time"
+
+	ppf "github.com/sudachen/pprof/util"
 )
 
 func (k messageKind) MarshalJSON() ([]byte, error) {
@@ -29,6 +31,42 @@ func (k *messageKind) fromString(s string) error {
 		return fmt.Errorf("invalid message kind %s", s)
 	}
 	return nil
+}
+
+func (b *Benchmark) toMap() map[string]interface{} {
+	m := b.T.toMap()
+
+	if b.Pprof != nil && b.Pprof.Len() != 0 {
+		f := make([]interface{}, 0, b.Pprof.Len())
+		for e := b.Pprof.Front(); e != nil; e = e.Next() {
+			p := e.Value.(*ppf.Report)
+			v := make(map[string]interface{})
+			v["label"] = p.Label
+			v["image"] = p.Image
+			v["unit"] = ppf.UnitToString(p.Unit)
+			r := make([]interface{}, len(p.Rows))
+			for i, x := range p.Rows {
+				r0 := make(map[string]string)
+				r0["flat"] = strconv.FormatFloat(x.Flat, 'f', -1, 64)
+				r0["flat%"] = strconv.FormatFloat(x.FlatPercent, 'f', -1, 64)
+				r0["cum"] = strconv.FormatFloat(x.Cum, 'f', -1, 64)
+				r0["cum%"] = strconv.FormatFloat(x.CumPercent, 'f', -1, 64)
+				r0["sum%"] = strconv.FormatFloat(x.SumPercent, 'f', -1, 64)
+				r0["function"] = x.Function
+				r[i] = r0
+			}
+			v["rows"] = r
+			r = make([]interface{}, len(p.Errors))
+			for i, x := range p.Errors {
+				r[i] = x
+			}
+			v["errors"] = r
+			f = append(f, v)
+		}
+		m["pprof"] = f
+	}
+
+	return m
 }
 
 func (t *T) toMap() map[string]interface{} {
@@ -63,41 +101,69 @@ func (t *T) toMap() map[string]interface{} {
 		m["messages"] = messages
 	}
 
-	if t.Pprof != nil && t.Pprof.Len() != 0 {
-		ppf := make([]interface{}, 0, t.Pprof.Len())
-		for e := t.Pprof.Front(); e != nil; e = e.Next() {
-			p := e.Value.(*Report)
-			v := make(map[string]interface{})
-			v["label"] = p.Label
-			v["unit"] = p.Unit.String()
-			v["options"] = p.Options.String()
-			r := make([]interface{}, len(p.Rows))
-			for i, x := range p.Rows {
-				r0 := make(map[string]string)
-				r0["flat"] = strconv.FormatFloat(x.Flat, 'f', -1, 64)
-				r0["flat%"] = strconv.FormatFloat(x.FlatPercent, 'f', -1, 64)
-				r0["cum"] = strconv.FormatFloat(x.Cum, 'f', -1, 64)
-				r0["cum%"] = strconv.FormatFloat(x.CumPercent, 'f', -1, 64)
-				r0["sum%"] = strconv.FormatFloat(x.SumPercent, 'f', -1, 64)
-				r0["function"] = x.Function
-				r[i] = r0
-			}
-			v["rows"] = r
-			r = make([]interface{}, len(p.Errors))
-			for i, x := range p.Errors {
-				r[i] = x
-			}
-			v["errors"] = r
-			ppf = append(ppf, v)
-		}
-		m["pprof"] = ppf
-	}
-
 	return m
 }
 
 func (t *T) MarshalJSON() ([]byte, error) {
 	return json.Marshal(t.toMap())
+}
+
+func (b *Benchmark) MarshalJSON() ([]byte, error) {
+	return json.Marshal(b.toMap())
+}
+
+func (b *Benchmark) fromMap(m map[string]interface{}) error {
+	b.T = &T{}
+	if err := b.T.fromMap(m); err != nil {
+		return err
+	}
+	if v, ok := m["pprof"]; ok {
+		b.Pprof = list.New()
+		for _, x := range v.([]interface{}) {
+			y := x.(map[string]interface{})
+			p0 := &ppf.Report{}
+			if err := ppf.UnitFromString(&p0.Unit,y["unit"].(string)); err != nil {
+				return err
+			}
+			p0.Label = y["label"].(string)
+			p0.Image = y["image"].(string)
+			if u, ok := y["rows"]; ok {
+				a := u.([]interface{})
+				p0.Rows = make(ppf.Rows, 0, len(a))
+				for _, z := range a {
+					var err error
+					w := z.(map[string]interface{})
+					r := &ppf.Row{}
+					if r.Flat, err = strconv.ParseFloat(w["flat"].(string), 64); err != nil {
+						return err
+					}
+					if r.FlatPercent, err = strconv.ParseFloat(w["flat%"].(string), 64); err != nil {
+						return err
+					}
+					if r.SumPercent, err = strconv.ParseFloat(w["sum%"].(string), 64); err != nil {
+						return err
+					}
+					if r.Cum, err = strconv.ParseFloat(w["cum"].(string), 64); err != nil {
+						return err
+					}
+					if r.CumPercent, err = strconv.ParseFloat(w["cum%"].(string), 64); err != nil {
+						return err
+					}
+					r.Function = w["function"].(string)
+					p0.Rows = append(p0.Rows, r)
+				}
+			}
+			if u, ok := y["errors"]; ok {
+				a := u.([]interface{})
+				p0.Errors = make([]string, 0, len(a))
+				for _, w := range a {
+					p0.Errors = append(p0.Errors, w.(string))
+				}
+			}
+			b.Pprof.PushBack(p0)
+		}
+	}
+	return nil
 }
 
 func (t *T) fromMap(m map[string]interface{}) error {
@@ -145,78 +211,29 @@ func (t *T) fromMap(m map[string]interface{}) error {
 		}
 	}
 
-	if v, ok := m["pprof"]; ok {
-		t.Pprof = list.New()
-		for _, x := range v.([]interface{}) {
-			y := x.(map[string]interface{})
-			p0 := &Report{}
-			if err := p0.Unit.fromString(y["unit"].(string)); err != nil {
-				return err
-			}
-			if err := p0.Options.fromString(y["options"].(string)); err != nil {
-				return err
-			}
-			p0.Label = y["label"].(string)
-			if u, ok := y["rows"]; ok {
-				a := u.([]interface{})
-				p0.Rows = make(Rows, 0, len(a))
-				for _, z := range a {
-					var err error
-					w := z.(map[string]interface{})
-					r := &Row{}
-					if r.Flat, err = strconv.ParseFloat(w["flat"].(string), 64); err != nil {
-						return err
-					}
-					if r.FlatPercent, err = strconv.ParseFloat(w["flat%"].(string), 64); err != nil {
-						return err
-					}
-					if r.SumPercent, err = strconv.ParseFloat(w["sum%"].(string), 64); err != nil {
-						return err
-					}
-					if r.Cum, err = strconv.ParseFloat(w["cum"].(string), 64); err != nil {
-						return err
-					}
-					if r.CumPercent, err = strconv.ParseFloat(w["cum%"].(string), 64); err != nil {
-						return err
-					}
-					r.Function = w["function"].(string)
-					p0.Rows = append(p0.Rows, r)
-				}
-			}
-			if u, ok := y["errors"]; ok {
-				a := u.([]interface{})
-				p0.Errors = make([]string, 0, len(a))
-				for _, w := range a {
-					p0.Errors = append(p0.Errors, w.(string))
-				}
-			}
-			t.Pprof.PushBack(p0)
-		}
-	}
-
 	return nil
 }
 
-func (t *T) UnmarshalJSON(b []byte) error {
+func (b *Benchmark) UnmarshalJSON(bs []byte) error {
 	var m map[string]interface{}
-	if err := json.Unmarshal(b, &m); err != nil {
+	if err := json.Unmarshal(bs, &m); err != nil {
 		return err
 	}
-	return t.fromMap(m)
+	return b.fromMap(m)
 }
 
-func (t *T) WriteJson(wr io.Writer) (int, error) {
-	if b, err := json.MarshalIndent(t.toMap(), "", "\t"); err != nil {
+func (b *Benchmark) WriteJson(wr io.Writer) (int, error) {
+	if bs, err := json.MarshalIndent(b.toMap(), "", "\t"); err != nil {
 		return 0, err
 	} else {
-		return wr.Write(b)
+		return wr.Write(bs)
 	}
 }
 
-func (t *T) ReadJson(rd io.Reader) error {
-	if b, err := ioutil.ReadAll(rd); err != nil {
+func (b *Benchmark) ReadJson(rd io.Reader) error {
+	if bs, err := ioutil.ReadAll(rd); err != nil {
 		return err
 	} else {
-		return json.Unmarshal(b, t)
+		return json.Unmarshal(bs, b)
 	}
 }

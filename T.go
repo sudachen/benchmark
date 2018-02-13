@@ -10,13 +10,16 @@ import (
 	"runtime"
 	"runtime/pprof"
 	"time"
+	"encoding/base64"
 
 	"github.com/sudachen/misc"
+	ppf "github.com/sudachen/pprof/util"
 )
 
 var flagNoGC = flag.Bool("nogc", false, "disable GC on benchmark")
 var flagPprof = flag.Bool("pprof", false, "profile benchmarks")
 var flagCpuProf = flag.String("cpuprof", misc.NulStr, "where to store cpuprofile")
+var flagCallgrapth = flag.Int("callgraph", -1, "count of nodes to write PNG callgraph")
 
 type messageKind byte
 
@@ -48,16 +51,23 @@ type Message struct {
 
 type T struct {
 	enableGC, isStarted, stopProfiler bool
-	startedAt, runOn                  time.Time
-	processor                         func(t *T, finished *T) *T
-	chActive, chPaused                time.Duration
+
+	processor           func(t *T, finished *T) *T
+	startedAt, runOn    time.Time
+	chActive, chPaused  time.Duration
 
 	Err   error
 	Label string
+	Count int
 
-	Count                     int
-	Children, Messages, Pprof *list.List
-	Active, Total             time.Duration
+	Active, Total time.Duration
+
+	Children, Messages *list.List
+}
+
+type Benchmark struct {
+	*T
+	Pprof *list.List
 }
 
 func New(label string) *T {
@@ -95,11 +105,11 @@ func (t *T) run(f func(*T) error) (err error) {
 
 const PprofBufferReserve = 1024 * 1024
 
-func (t *T) pprofRun(f func(*T) error) {
+func (t *Benchmark) pprofRun(f func(*T) error) {
 	var buf bytes.Buffer
 	if *flagPprof || *flagCpuProf != misc.NulStr {
 		buf.Grow(PprofBufferReserve)
-		runtime.SetCPUProfileRate(10000)
+		//runtime.SetCPUProfileRate(10000)
 		pprof.StartCPUProfile(&buf)
 	}
 	t.run(f)
@@ -108,41 +118,49 @@ func (t *T) pprofRun(f func(*T) error) {
 	}
 	if *flagPprof {
 		count := 25
+		pngcount := *flagCallgrapth
+		if pngcount == 0 { pngcount = count }
 		t.Pprof = list.New()
-		t.Pprof.PushBack(Top(buf.Bytes(), count, Tagged, Msec, "top"))
-		t.Pprof.PushBack(Top(buf.Bytes(), count, Tagged|SortByCum, Msec, "top-cum"))
-		t.Pprof.PushBack(Top(buf.Bytes(), count, DefaultReport, Msec, "top-all"))
-		t.Pprof.PushBack(Top(buf.Bytes(), count, SortByCum, Msec, "top-all-cum"))
-		t.Pprof.PushBack(Top(buf.Bytes(), count, Tagged|RuntimeOnly, Msec, "top-rt"))
-		t.Pprof.PushBack(Top(buf.Bytes(), count, Tagged|ExcludeRuntime, Msec, "top-nort"))
+		opt := &ppf.Options{ TagFocus: []string{"t:"}, Unit: ppf.Second }
+		rpt := ppf.Top(buf.Bytes(), count, opt, "top")
+		if pngcount > 0 {
+			rpt.Image = base64.StdEncoding.EncodeToString(ppf.Png(buf.Bytes(), pngcount, opt))
+		}
+		t.Pprof.PushBack(rpt)
+		opt = &ppf.Options{ Unit: ppf.Second }
+		rpt = ppf.Top(buf.Bytes(), count, opt, "top-all")
+		if pngcount > 0 {
+			rpt.Image = base64.StdEncoding.EncodeToString(ppf.Png(buf.Bytes(), pngcount, opt))
+		}
+		t.Pprof.PushBack(rpt)
 	}
 	if *flagCpuProf != misc.NulStr {
 		ioutil.WriteFile(*flagCpuProf, buf.Bytes(), 0644)
 	}
 }
 
-func Run(label string, f func(*T) error) *T {
+func Run(label string, f func(*T) error) *Benchmark {
 	if !flag.Parsed() {
 		flag.Parse()
 	}
 	runtime.LockOSThread()
-	t := New(label)
-	t.pprofRun(f)
-	return t
+	b := &Benchmark{T:New(label)}
+	b.pprofRun(f)
+	return b
 }
 
-func RunWithProcessor(label string, processor func(*T, *T) *T, f func(*T) error) *T {
+func RunWithProcessor(label string, processor func(*T, *T) *T, f func(*T) error) *Benchmark {
 	if !flag.Parsed() {
 		flag.Parse()
 	}
 	runtime.LockOSThread()
-	t := New(label)
-	t.processor = processor
-	t.pprofRun(f)
-	if t.processor != nil {
-		t.processor(nil, t)
+	b := &Benchmark{T:New(label)}
+	b.processor = processor
+	b.pprofRun(f)
+	if b.processor != nil {
+		b.processor(nil, b.T)
 	}
-	return t
+	return b
 }
 
 func (t *T) Run(label string, f func(*T) error) (err error) {
@@ -159,7 +177,7 @@ func (t *T) Run(label string, f func(*T) error) (err error) {
 		t.Children.PushBack(t0)
 		t.chActive += t0.Active
 	}
-	return
+	return t0.Err
 }
 
 func (t *T) Start() {
