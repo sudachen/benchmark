@@ -4,8 +4,8 @@ import (
 	"bufio"
 	"bytes"
 	"errors"
-	"testing"
 	"flag"
+	"testing"
 )
 
 type F struct {
@@ -35,7 +35,7 @@ func Test1(t *testing.T) {
 
 	flag.Parse()
 	flag.Lookup("pprof").Value.Set("true")
-	
+
 	t0 := Run(".", func(t1 *T) error {
 		for _, f := range funcs {
 			t1.Run(f.Label, f.Func)

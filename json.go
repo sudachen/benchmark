@@ -122,7 +122,7 @@ func (b *Benchmark) fromMap(m map[string]interface{}) error {
 		for _, x := range v.([]interface{}) {
 			y := x.(map[string]interface{})
 			p0 := &ppf.Report{}
-			if err := ppf.UnitFromString(&p0.Unit,y["unit"].(string)); err != nil {
+			if err := ppf.UnitFromString(&p0.Unit, y["unit"].(string)); err != nil {
 				return err
 			}
 			p0.Label = y["label"].(string)

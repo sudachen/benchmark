@@ -4,13 +4,13 @@ import (
 	"bytes"
 	"container/list"
 	"context"
+	"encoding/base64"
 	"flag"
 	"fmt"
 	"io/ioutil"
 	"runtime"
 	"runtime/pprof"
 	"time"
-	"encoding/base64"
 
 	"github.com/sudachen/misc"
 	ppf "github.com/sudachen/pprof/util"
@@ -52,9 +52,9 @@ type Message struct {
 type T struct {
 	enableGC, isStarted, stopProfiler bool
 
-	processor           func(t *T, finished *T) *T
-	startedAt, runOn    time.Time
-	chActive, chPaused  time.Duration
+	processor          func(t *T, finished *T) *T
+	startedAt, runOn   time.Time
+	chActive, chPaused time.Duration
 
 	Err   error
 	Label string
@@ -119,15 +119,17 @@ func (t *Benchmark) pprofRun(f func(*T) error) {
 	if *flagPprof {
 		count := 25
 		pngcount := *flagCallgrapth
-		if pngcount == 0 { pngcount = count }
+		if pngcount == 0 {
+			pngcount = count
+		}
 		t.Pprof = list.New()
-		opt := &ppf.Options{ TagFocus: []string{"t:"}, Unit: ppf.Second }
+		opt := &ppf.Options{TagFocus: []string{"t:"}, Unit: ppf.Second}
 		rpt := ppf.Top(buf.Bytes(), count, opt, "top")
 		if pngcount > 0 {
 			rpt.Image = base64.StdEncoding.EncodeToString(ppf.Png(buf.Bytes(), pngcount, opt))
 		}
 		t.Pprof.PushBack(rpt)
-		opt = &ppf.Options{ Unit: ppf.Second }
+		opt = &ppf.Options{Unit: ppf.Second}
 		rpt = ppf.Top(buf.Bytes(), count, opt, "top-all")
 		if pngcount > 0 {
 			rpt.Image = base64.StdEncoding.EncodeToString(ppf.Png(buf.Bytes(), pngcount, opt))
@@ -144,7 +146,7 @@ func Run(label string, f func(*T) error) *Benchmark {
 		flag.Parse()
 	}
 	runtime.LockOSThread()
-	b := &Benchmark{T:New(label)}
+	b := &Benchmark{T: New(label)}
 	b.pprofRun(f)
 	return b
 }
@@ -154,7 +156,7 @@ func RunWithProcessor(label string, processor func(*T, *T) *T, f func(*T) error)
 		flag.Parse()
 	}
 	runtime.LockOSThread()
-	b := &Benchmark{T:New(label)}
+	b := &Benchmark{T: New(label)}
 	b.processor = processor
 	b.pprofRun(f)
 	if b.processor != nil {
