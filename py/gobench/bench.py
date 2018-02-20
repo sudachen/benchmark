@@ -5,6 +5,7 @@ import json
 from . import exec
 
 BENCHMARK_FILE = 'benchmark.go'
+BENCHMARK_RESULT_FILE = 'benchmark.js'
 
 
 class Benchmark(object):
@@ -14,7 +15,20 @@ class Benchmark(object):
         self.label = label
         self.env = env
 
-    def execute(self, the_branch, temp=None, pprof=None, callgraph=None):
+    def load_or_execute(self, the_branch, temp=None, pprof=None, callgraph=None, result=True):
+        workdir = the_branch.dirname(self.label)
+        if result in (None , True):
+            result = True
+            result_path = os.path.join(workdir, BENCHMARK_RESULT_FILE)
+        else:
+            result_path = result
+        if os.path.exists(result_path):
+            with open(result_path) as f:
+                return load(the_branch, f)
+        else:
+            return self.execute(the_branch, temp, pprof, callgraph, result)
+
+    def execute(self, the_branch, temp=None, pprof=None, callgraph=None, result=None):
         workdir = the_branch.dirname(self.label)
         ex = exec.Executor(workdir, self.env, temp)
 
@@ -32,15 +46,26 @@ class Benchmark(object):
         else:
             pngopt = ()
 
+        if result is True:
+            resopt = ['--result='+BENCHMARK_RESULT_FILE]
+        elif isinstance(result,str):
+            resopt = ['--result='+result]
+        else:
+            resopt = ()
 
-        status = ex.run("go","run",BENCHMARK_FILE,*ppfopt,*pngopt)
+        status = ex.run("go", "run", BENCHMARK_FILE, *ppfopt, *pngopt, *resopt)
         ex.stdout.seek(0)
         ex.stderr.seek(0)
 
         if status is not exec.Success:
             raise ExecutionBenchmarkError(self.label, status.reason)
 
-        return load(the_branch,ex.stdout)
+        if result is None:
+            return load(the_branch, ex.stdout)
+        else:
+            fname = os.path.join(workdir,BENCHMARK_RESULT_FILE) if result is True else result
+            with open(fname,"r") as f:
+                return load(the_branch, f)
 
 
 class BenchmarkError(Exception):

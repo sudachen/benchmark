@@ -42,13 +42,19 @@ class UnknownExtension(ExecutorError):
 class Executor(object):
     __slots__ = ('env', 'temp', 'stderr', 'stdout', 'workdir')
 
-    def __init__(self, workdir, env, temp):
+    def __init__(self, workdir, env, temp, stdout_filename=None, stderr_filename=None):
         self.env = env.get()
         self.temp = temp
         self.workdir = workdir
         delete = True if temp is None else False
-        self.stdout = tempfile.NamedTemporaryFile(mode="w+t", dir=temp, delete=delete)
-        self.stderr = tempfile.NamedTemporaryFile(mode="w+t", dir=temp, delete=delete)
+        if stdout_filename is None:
+            self.stdout = tempfile.NamedTemporaryFile(mode="w+t", dir=temp, delete=delete)
+        else:
+            self.stdout = open(stdout_filename,"w+")
+        if stderr_filename is None:
+            self.stderr = tempfile.NamedTemporaryFile(mode="w+t", dir=temp, delete=delete)
+        else:
+            self.stderr = open(stderr_filename,"w+")
 
     def run(self,*args):
         try:

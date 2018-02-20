@@ -14,12 +14,14 @@ import (
 
 	"github.com/sudachen/misc"
 	ppf "github.com/sudachen/pprof/util"
+	"os"
 )
 
 var flagNoGC = flag.Bool("nogc", false, "disable GC on benchmark")
 var flagPprof = flag.Bool("pprof", false, "profile benchmarks")
 var flagCpuProf = flag.String("cpuprof", misc.NulStr, "where to store cpuprofile")
 var flagCallgrapth = flag.Int("callgraph", -1, "count of nodes to write PNG callgraph")
+var flagResult = flag.String("result", misc.NulStr, "file name to write the benchmarking result")
 
 type messageKind byte
 
@@ -235,4 +237,16 @@ func (t *T) Info(a ...interface{}) {
 func (t *T) Opt(a string) {
 	m := &Message{MsgOpt, a}
 	t.Messages.PushBack(m)
+}
+
+func (b *Benchmark) WriteJsonResult() (int, error) {
+	if *flagResult != misc.NulStr {
+		if f, err := os.Create(*flagResult); err != nil {
+			return 0, err
+		} else {
+			return b.WriteJson(f)
+		}
+	} else {
+		return b.WriteJson(os.Stderr)
+	}
 }
