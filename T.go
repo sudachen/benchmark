@@ -4,17 +4,16 @@ import (
 	"bytes"
 	"container/list"
 	"context"
-	"encoding/base64"
 	"flag"
 	"fmt"
 	"io/ioutil"
+	"os"
 	"runtime"
 	"runtime/pprof"
 	"time"
 
+	ppf "github.com/sudachen/benchmark/ppftool"
 	"github.com/sudachen/misc"
-	ppf "github.com/sudachen/pprof/util"
-	"os"
 )
 
 var flagNoGC = flag.Bool("nogc", false, "disable GC on benchmark")
@@ -121,21 +120,21 @@ func (t *Benchmark) pprofRun(f func(*T) error) {
 	if *flagPprof {
 		count := 25
 		pngcount := *flagCallgrapth
-		if pngcount == 0 {
-			pngcount = count
-		}
 		t.Pprof = list.New()
-		opt := &ppf.Options{TagFocus: []string{"t:"}, Unit: ppf.Second}
-		rpt := ppf.Top(buf.Bytes(), count, opt, "top")
-		if pngcount > 0 {
-			rpt.Image = base64.StdEncoding.EncodeToString(ppf.Png(buf.Bytes(), pngcount, opt))
+
+		opt := &ppf.Options{
+			Unit:      ppf.Second,
+			Count:     count,
+			Callgraph: ppf.PNG,
+			Callcount: pngcount,
+			NoLegend:  true,
 		}
+
+		rpt, _ := ppf.Top(buf.Bytes(), opt, "top-all")
 		t.Pprof.PushBack(rpt)
-		opt = &ppf.Options{Unit: ppf.Second}
-		rpt = ppf.Top(buf.Bytes(), count, opt, "top-all")
-		if pngcount > 0 {
-			rpt.Image = base64.StdEncoding.EncodeToString(ppf.Png(buf.Bytes(), pngcount, opt))
-		}
+
+		opt.TagFocus = []string{"t:"}
+		rpt, _ = ppf.Top(buf.Bytes(), opt, "top")
 		t.Pprof.PushBack(rpt)
 	}
 	if *flagCpuProf != misc.NulStr {

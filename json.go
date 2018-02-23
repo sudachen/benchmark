@@ -10,7 +10,7 @@ import (
 	"strconv"
 	"time"
 
-	ppf "github.com/sudachen/pprof/util"
+	ppf "github.com/sudachen/benchmark/ppftool"
 )
 
 func (k messageKind) MarshalJSON() ([]byte, error) {
@@ -40,27 +40,7 @@ func (b *Benchmark) toMap() map[string]interface{} {
 		f := make([]interface{}, 0, b.Pprof.Len())
 		for e := b.Pprof.Front(); e != nil; e = e.Next() {
 			p := e.Value.(*ppf.Report)
-			v := make(map[string]interface{})
-			v["label"] = p.Label
-			v["image"] = p.Image
-			v["unit"] = ppf.UnitToString(p.Unit)
-			r := make([]interface{}, len(p.Rows))
-			for i, x := range p.Rows {
-				r0 := make(map[string]string)
-				r0["flat"] = strconv.FormatFloat(x.Flat, 'f', -1, 64)
-				r0["flat%"] = strconv.FormatFloat(x.FlatPercent, 'f', -1, 64)
-				r0["cum"] = strconv.FormatFloat(x.Cum, 'f', -1, 64)
-				r0["cum%"] = strconv.FormatFloat(x.CumPercent, 'f', -1, 64)
-				r0["sum%"] = strconv.FormatFloat(x.SumPercent, 'f', -1, 64)
-				r0["function"] = x.Function
-				r[i] = r0
-			}
-			v["rows"] = r
-			r = make([]interface{}, len(p.Errors))
-			for i, x := range p.Errors {
-				r[i] = x
-			}
-			v["errors"] = r
+			v := p.ToMap()
 			f = append(f, v)
 		}
 		m["pprof"] = f
@@ -122,44 +102,7 @@ func (b *Benchmark) fromMap(m map[string]interface{}) error {
 		for _, x := range v.([]interface{}) {
 			y := x.(map[string]interface{})
 			p0 := &ppf.Report{}
-			if err := ppf.UnitFromString(&p0.Unit, y["unit"].(string)); err != nil {
-				return err
-			}
-			p0.Label = y["label"].(string)
-			p0.Image = y["image"].(string)
-			if u, ok := y["rows"]; ok {
-				a := u.([]interface{})
-				p0.Rows = make(ppf.Rows, 0, len(a))
-				for _, z := range a {
-					var err error
-					w := z.(map[string]interface{})
-					r := &ppf.Row{}
-					if r.Flat, err = strconv.ParseFloat(w["flat"].(string), 64); err != nil {
-						return err
-					}
-					if r.FlatPercent, err = strconv.ParseFloat(w["flat%"].(string), 64); err != nil {
-						return err
-					}
-					if r.SumPercent, err = strconv.ParseFloat(w["sum%"].(string), 64); err != nil {
-						return err
-					}
-					if r.Cum, err = strconv.ParseFloat(w["cum"].(string), 64); err != nil {
-						return err
-					}
-					if r.CumPercent, err = strconv.ParseFloat(w["cum%"].(string), 64); err != nil {
-						return err
-					}
-					r.Function = w["function"].(string)
-					p0.Rows = append(p0.Rows, r)
-				}
-			}
-			if u, ok := y["errors"]; ok {
-				a := u.([]interface{})
-				p0.Errors = make([]string, 0, len(a))
-				for _, w := range a {
-					p0.Errors = append(p0.Errors, w.(string))
-				}
-			}
+			p0.FromMap(y)
 			b.Pprof.PushBack(p0)
 		}
 	}
