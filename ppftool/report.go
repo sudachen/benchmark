@@ -9,8 +9,8 @@ import (
 type Report struct {
 	Unit
 	Rows
-	Label  string
 	Errors []string
+	Label  string
 	Image  string
 }
 
@@ -28,6 +28,10 @@ const (
 	Second      Unit = 0
 	Millisecond Unit = 1
 	Microsecond Unit = 2
+	Megabyte	Unit = 3
+	Kilobyte	Unit = 4
+	Byte		Unit = 5
+	None		Unit = 6
 )
 
 var DefaultUnit = Second
@@ -40,6 +44,14 @@ func (u Unit) String() string {
 		return "ms"
 	case Second:
 		return "s"
+	case Megabyte:
+		return "mb"
+	case Kilobyte:
+		return "kb"
+	case Byte:
+		return "b"
+	case None:
+		return ""
 	default:
 		return DefaultUnit.String()
 	}
@@ -55,6 +67,18 @@ func (u *Unit) FromString(s string) error {
 		return nil
 	case "s":
 		*u = Second
+		return nil
+	case "mb":
+		*u = Megabyte
+		return nil
+	case "kb":
+		*u = Kilobyte
+		return nil
+	case "b":
+		*u = Byte
+		return nil
+	case "":
+		*u = None
 		return nil
 	}
 	return errors.New("invalid unit string")

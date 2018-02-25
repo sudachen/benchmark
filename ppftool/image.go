@@ -10,37 +10,40 @@ import (
 	"strings"
 )
 
-type Callgraph byte
+type Graph byte
 
 const (
-	NoImage Callgraph = iota
+	NoImage Graph = iota
 	PNG
 	SVG
 	DOT
 )
 
-func Image(b []byte, o *Options) ([]byte, error) {
+func Image(b []byte, o *Options, u driver.UI) ([]byte, error) {
 
 	bf := &bytes.Buffer{}
 
-	if o.Callcount > 0 {
+	if o.Gcount > 0 {
 		o0 := *o
-		o0.Count = o.Callcount
+		o0.Count = o.Gcount
 		o = &o0
 	}
 
 	cmd := "-png"
-	if o.NoLegend || o.Callgraph == DOT {
+	if o.NoLegend || o.Graph == DOT {
 		cmd = "-dot"
-	} else if o.Callgraph == SVG {
+	} else if o.Graph == SVG {
 		cmd = "-svg"
 	}
 
 	tempfile := TempFileName()
+	if u == nil {
+		u = &ui{}
+	}
 	err := driver.PProf(&driver.Options{
 		Fetch:   &fetcher{b},
 		Flagset: o.flagset(cmd, "-output="+tempfile),
-		UI:      &ui{},
+		UI:      u,
 		Writer:  &writer{bf},
 	})
 
@@ -70,11 +73,11 @@ func Image(b []byte, o *Options) ([]byte, error) {
 			}
 		}
 
-		if o.Callgraph != DOT {
+		if o.Graph != DOT {
 
 			obf := &bytes.Buffer{}
 			format := "png"
-			if o.Callgraph == SVG {
+			if o.Graph == SVG {
 				cmd = "-svg"
 			}
 

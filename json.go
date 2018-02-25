@@ -81,6 +81,10 @@ func (t *T) toMap() map[string]interface{} {
 		m["messages"] = messages
 	}
 
+	if t.Heap != nil {
+		m["heap"] = t.Heap.ToMap()
+	}
+
 	return m
 }
 
@@ -152,6 +156,13 @@ func (t *T) fromMap(m map[string]interface{}) error {
 			}
 			t.Messages.PushBack(m0)
 		}
+	}
+
+	if v, ok := m["heap"]; ok {
+		y := v.(map[string]interface{})
+		p0 := &ppf.Report{}
+		p0.FromMap(y)
+		t.Heap = p0
 	}
 
 	return nil
