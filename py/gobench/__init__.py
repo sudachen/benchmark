@@ -1,7 +1,7 @@
 
 from .bench import Benchmark
 from .util import *
-from .pprof import BENCHMARK_PPROF
+from .pprof import BENCHMARK_PPROF, BENCHMARK_MPROF
 
 __all__ = [
     'Benchmark',
@@ -14,5 +14,6 @@ __all__ = [
     'Fail',
     'Return',
     'BENCHMARK_PPROF',
+    'BENCHMARK_MPROF',
 ]
 

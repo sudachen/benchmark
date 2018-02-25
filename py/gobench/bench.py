@@ -15,7 +15,7 @@ class Benchmark(object):
         self.label = label
         self.env = env
 
-    def load_or_execute(self, the_branch, temp=None, pprof=None, callgraph=None, result=True):
+    def load_or_execute(self, the_branch, temp=None, pprof=None, mprof=None, callgraph=None, result=True):
         workdir = the_branch.dirname(self.label)
         if result in (None , True):
             result = True
@@ -26,9 +26,9 @@ class Benchmark(object):
             with open(result_path) as f:
                 return load(the_branch, f)
         else:
-            return self.execute(the_branch, temp, pprof, callgraph, result)
+            return self.execute(the_branch, temp, pprof, mprof, callgraph, result)
 
-    def execute(self, the_branch, temp=None, pprof=None, callgraph=None, result=None):
+    def execute(self, the_branch, temp=None, pprof=None, mprof=None, callgraph=None, result=None):
         workdir = the_branch.dirname(self.label)
         ex = exec.Executor(workdir, self.env, temp)
 
@@ -39,12 +39,19 @@ class Benchmark(object):
         else:
             ppfopt = ()
 
+        if mprof is True:
+            mpfopt = ['--mprof']
+        elif isinstance(pprof,str):
+            mpfopt = ['--mprof','--memprof='+mprof]
+        else:
+            mpfopt = ()
+
         if callgraph is True:
-            pngopt = ['--callgraph=0']
+            pngopt = ()
         elif isinstance(callgraph,int):
             pngopt = ['--callgraph='+str(callgraph)]
         else:
-            pngopt = ()
+            pngopt = ['--callgraph=-1']
 
         if result is True:
             resopt = ['--result='+BENCHMARK_RESULT_FILE]
@@ -53,7 +60,7 @@ class Benchmark(object):
         else:
             resopt = ()
 
-        status = ex.run("go", "run", BENCHMARK_FILE, *ppfopt, *pngopt, *resopt)
+        status = ex.run("go", "run", BENCHMARK_FILE, *ppfopt, *mpfopt, *pngopt, *resopt)
         ex.stdout.seek(0)
         ex.stderr.seek(0)
 
@@ -195,6 +202,10 @@ class PprofUnit(object):
 Msec = PprofUnit("ms")
 Usec = PprofUnit("us")
 Sec = PprofUnit("s")
+Byte = PprofUnit("b")
+Megabyte = PprofUnit("mb")
+Kilobyte = PprofUnit("kb")
+Nothing = PprofUnit("")
 
 
 class Pprof(object):
@@ -209,6 +220,14 @@ class Pprof(object):
             self.unit = Usec
         elif unit == 's':
             self.unit = Sec
+        elif unit == 'kb':
+            self.unit = Kilobyte
+        elif unit == 'mb':
+            self.unit = Megabyte
+        elif unit == 'b':
+            self.unit = Byte
+        elif unit == '':
+            self.unit = Nothing
         self.rows = rows
         self.errors = errors
 

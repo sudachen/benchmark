@@ -7,6 +7,7 @@ from . import bench
 from .util import Return, Fail
 
 BENCHMARK_PPROF = "benchmark.pprof"
+BENCHMARK_MPROF = "benchmark.mprof"
 
 def run(workdir,*args):
     try:
