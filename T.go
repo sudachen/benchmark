@@ -67,7 +67,7 @@ type T struct {
 	Active, Total time.Duration
 
 	Children, Messages *list.List
-	Heap *ppf.Report
+	Heap               *ppf.Report
 }
 
 type Benchmark struct {

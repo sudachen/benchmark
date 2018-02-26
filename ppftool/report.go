@@ -28,10 +28,10 @@ const (
 	Second      Unit = 0
 	Millisecond Unit = 1
 	Microsecond Unit = 2
-	Megabyte	Unit = 3
-	Kilobyte	Unit = 4
-	Byte		Unit = 5
-	None		Unit = 6
+	Megabyte    Unit = 3
+	Kilobyte    Unit = 4
+	Byte        Unit = 5
+	None        Unit = 6
 )
 
 var DefaultUnit = Second

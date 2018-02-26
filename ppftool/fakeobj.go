@@ -1,12 +1,12 @@
 package ppftool
 
-import(
+import (
 	"errors"
 
 	"github.com/google/pprof/driver"
 )
 
-type objtool struct {}
+type objtool struct{}
 
 func (o objtool) Open(file string, start, limit, offset uint64) (driver.ObjFile, error) {
 	return nil, errors.New("nofile")

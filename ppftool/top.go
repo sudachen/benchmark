@@ -1,9 +1,9 @@
 package ppftool
 
 import (
+	"encoding/base64"
 	"io/ioutil"
 	"os"
-	"encoding/base64"
 
 	"github.com/google/pprof/driver"
 )
@@ -11,7 +11,7 @@ import (
 func Top(b []byte, o *Options) (*Report, error) {
 
 	tempfile := TempFileName() // if driver.Options.Writer is skipped by pprof
-	                           // output will be recorded to this file
+	// output will be recorded to this file
 
 	rpt := &Report{Unit: o.unit()}
 
@@ -20,7 +20,7 @@ func Top(b []byte, o *Options) (*Report, error) {
 		Flagset: o.flagset("-top", "-output="+tempfile),
 		UI:      &ui{rpt},
 		Writer:  &writer{rpt},
-		Obj:	 &objtool{},
+		Obj:     &objtool{},
 	})
 
 	if err != nil {

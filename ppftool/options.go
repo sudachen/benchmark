@@ -11,16 +11,16 @@ type Options struct {
 	Unit // Second, Millisecond, Microsecond
 	Index
 
-	Count    int      // -nodecount=
-	CumSort  bool     // -cum=
-	TagShow  []string // -tagshow=
-	TagHide  []string // -taghide=
-	TagIgnore[]string // -tagignore=
-	TagFocus []string // -tagfocus=
-	Ignore   []string // -ignore=
-	Focus    []string // -focus=
-	Show     []string // -show=
-	Hide     []string // -hide=
+	Count     int      // -nodecount=
+	CumSort   bool     // -cum=
+	TagShow   []string // -tagshow=
+	TagHide   []string // -taghide=
+	TagIgnore []string // -tagignore=
+	TagFocus  []string // -tagfocus=
+	Ignore    []string // -ignore=
+	Focus     []string // -focus=
+	Show      []string // -show=
+	Hide      []string // -hide=
 
 	Graph         // type of callgrapth image NoImage, PNG, SVG, DOT
 	Gcount   int  // -nodecount for callgraph, if <=0 is used Count
@@ -28,6 +28,7 @@ type Options struct {
 }
 
 type Index byte
+
 const (
 	CpuProfIndex Index = iota
 	AllocObjectsIndex
