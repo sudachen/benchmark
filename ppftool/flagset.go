@@ -24,6 +24,9 @@ func (f *flagset) Parse(usage func()) []string {
 	return f.FlagSet.Args()
 }
 
+func (f *flagset) AddExtraUsage(string) {
+}
+
 func Flagset(a ...string) driver.FlagSet {
 	return &flagset{flag.NewFlagSet("ppf", flag.ContinueOnError), append(a, "")}
 }

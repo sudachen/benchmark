@@ -1,5 +1,5 @@
 
-from .bench import Benchmark
+from .bench import Benchmark, load_results
 from .util import *
 from .pprof import BENCHMARK_PPROF, BENCHMARK_MPROF
 
@@ -15,5 +15,6 @@ __all__ = [
     'Return',
     'BENCHMARK_PPROF',
     'BENCHMARK_MPROF',
+    'load_results',
 ]
 

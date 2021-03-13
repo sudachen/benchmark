@@ -12,6 +12,6 @@ func (o objtool) Open(file string, start, limit, offset uint64) (driver.ObjFile,
 	return nil, errors.New("nofile")
 }
 
-func (o objtool) Disasm(file string, start, end uint64) ([]driver.Inst, error) {
+func (o objtool) Disasm(file string, start, end uint64, intelSyntax bool) ([]driver.Inst, error) {
 	return nil, errors.New("nofile")
 }
